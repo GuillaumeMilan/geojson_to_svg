@@ -1,0 +1,114 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <input type="file" id="input" onchange="file_reader(this)"></input>
+    <div id="map"></div>
+    <div id="custom_map"></div>
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <script>
+      function file_reader(file) {
+        const sleep = (milliseconds) => {
+          return new Promise(resolve => setTimeout(resolve, milliseconds))
+        }
+        var selectedFile = document.getElementById('input').files[0];
+        var reader = new FileReader();
+        reader.onload = (r) => {
+          on_load_map(JSON.parse(reader.result));
+          on_load_custom_map(JSON.parse(reader.result))
+        }
+        reader.readAsText(selectedFile);
+      }
+
+      function on_load_map(geoJsonObj) {
+        var projection = d3.geo.mercator()
+                                   .translate([100, 1200])
+                                   .scale(1000);
+        var path = d3.geo.path()
+                             .projection(projection);
+        var svg = d3.select("#map").append("svg")
+            .attr("width", 640)
+            .attr("height", 480);
+        svg.append("g")
+            .selectAll("path")
+            .data(geoJsonObj.features)
+            .enter().append("path")
+            .attr("d", path);
+
+        console.log("D3 DONE")
+      }
+      /* *** POLYGON *** */
+      function get_geojson_polygon_dimension(feature) {
+        let reducer = (acc, x) => {
+          if(!(acc.longitude.min<x[0]))
+            acc.longitude.min = x[0]
+          if(!(acc.longitude.max>x[0]))
+            acc.longitude.max = x[0]
+          if(!(acc.latitude.min<x[1]))
+            acc.latitude.min = x[1]
+          if(!(acc.latitude.max>x[1]))
+            acc.latitude.max = x[1]
+          return acc
+        }
+        return feature.geometry.coordinates.slice(1).reduce((acc, point_mass) => 
+          extends_dimension(acc, point_mass.reduce(reducer, {longitude: {}, latitude: {}}))
+        , feature.geometry.coordinates[0].reduce(reducer, {longitude: {}, latitude: {}}))
+      }
+      function print_geojson_polygon(feature, width, height, whole_dimension) {
+        /* TODO Modify to include emptied polygons */
+        return "<path d=\"" + 
+          feature.geometry.coordinates[0].slice(1).reduce((acc,p) => {
+            return acc+`L${from_Ll_to_coordinate(p, whole_dimension, width, height).join(" ")} `
+          }, `M${from_Ll_to_coordinate(feature.geometry.coordinates[0][0], whole_dimension, width, height).join(" ")} `) + 
+          "\"/>"
+      }
+      /* *** COMMON *** */
+      function get_geojson_dimension(feature) {
+        return {
+          "Point": (f) => {throw "Not yet implemented"},/*TODO*/
+          "Polygon": (f) => get_geojson_polygon_dimension(f),
+          "LineString": (f) => {throw "Not yet implemented"},/*TODO*/
+          "MultiPoint": (f) => {throw "Not yet implemented"},/*TODO*/
+          "MultiLineString": (f) => {throw "Not yet implemented"},/*TODO*/
+          "MultiPolygon": (f) => {throw "Not yet implemented"},/*TODO*/
+        }[feature.geometry.type](feature)
+      }
+      function print_geojson_feature(feature, width, height, dimension) {
+        console.log("printing feature", feature.properties && feature.properties.nom)
+        return {
+          "Point": (f,w,h,d) => "", /*TODO*/
+          "Polygon": (f,w,h,d) => print_geojson_polygon(f,w,h,d),
+          "LineString": (f,w,h,d) => "",/*TODO*/
+          "MultiPoint": (f,w,h,d) => "",/*TODO*/
+          "MultiLineString": (f,w,h,d) => "",/*TODO*/
+          "MultiPolygon": (f,w,h,d) => ""/*TODO*/
+        }[feature.geometry.type](feature, width, height, dimension)
+      }
+      function extends_dimension(d1, d2) {
+        let dimension = {longitude: {}, latitude: {}}
+        dimension.longitude.max = Math.max(d1.longitude.max, d2.longitude.max)
+        dimension.latitude.max = Math.max(d1.latitude.max, d2.latitude.max)
+        dimension.longitude.min = Math.min(d1.longitude.min, d2.longitude.min)
+        dimension.latitude.min = Math.min(d1.latitude.min, d2.latitude.min)
+        return dimension
+      }
+      function from_Ll_to_coordinate(point,dimension, width, height) {
+        return [
+          width  * (point[0]-dimension.longitude.min)/(dimension.longitude.max - dimension.longitude.min), 
+          height * (point[1]-dimension.latitude.min)/(dimension.latitude.max - dimension.latitude.min)
+        ]
+      }
+      /* *** MAIN *** */
+      function print_geojson_features(features_list, width="640", height="480") {
+        console.log("dimension", get_geojson_dimension(features_list[0]))
+        features_list = features_list.slice(0,1)
+        let dimension = features_list.slice(1).reduce(((acc,f) => extends_dimension(acc, get_geojson_dimension(f))), get_geojson_dimension(features_list[0]))
+        return `<svg width=${width} height=${height}><g>${features_list.reduce((acc, x) => acc+print_geojson_feature(x, width, height, dimension), "")}</g></svg>`
+      }
+      function  on_load_custom_map(geoJsonObj) {
+        document.getElementById("custom_map").innerHTML = print_geojson_features(geoJsonObj.features)
+        console.log("MANUAL DONE")
+      }
+    </script>
+  </body>
+<html>
