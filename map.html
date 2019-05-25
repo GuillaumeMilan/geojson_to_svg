@@ -106,10 +106,30 @@
         dimension.latitude.min = Math.min(d1.latitude.min, d2.latitude.min)
         return dimension
       }
+var used  = 0
       function from_Ll_to_coordinate(point,dimension, width, height) {
-        return [
+        /*return [
           width * (point[0]-dimension.longitude.min)/(dimension.longitude.max - dimension.longitude.min), 
           height - (height * (point[1]-dimension.latitude.min)/(dimension.latitude.max - dimension.latitude.min))
+        ]*/
+        let sinus = (x) => Math.sin(Math.PI*x/90)
+        let lon_med = (dimension.longitude.max + dimension.longitude.min)/2
+        let lat_med = (dimension.latitude.max + dimension.latitude.min)/2
+        let x_min = sinus(dimension.longitude.min - lon_med)
+        let y_min = sinus(dimension.latitude.min - lat_med)
+        let factor = width / (2*sinus(dimension.longitude.max - lon_med))
+        if(used < 10) {
+          used++
+          console.log("lon_med", lon_med)
+          console.log("lat_med", lat_med)
+          console.log("x_min", x_min)
+          console.log("x_max", sinus(dimension.longitude.max - lon_med))
+          console.log("y_min", y_min)
+          console.log("facrtor", factor)
+        }
+        return [
+          factor * (sinus(point[0] - lon_med) - x_min),
+          height - (factor * (sinus(point[1] - lat_med) - y_min))
         ]
       }
       /* *** MAIN *** */
